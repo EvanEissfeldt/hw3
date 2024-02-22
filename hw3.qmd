@@ -35,8 +35,6 @@ goal is to model wine quality based on physicochemical tests
 We will be using the following libraries:
 
 ```{R}
-rm(list=ls())
-
 library(readr)
 library(tidyr)
 library(dplyr)
@@ -60,12 +58,10 @@ Regression with categorical covariate and $t$-Test
 Read the wine quality datasets from the specified URLs and store them in
 data frames `df1` and `df2`.
 
-``` {r}
+```{r}
+rm(list=ls())
 url1 <- "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv"
-
 url2 <- "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv"
-
-
 df1 <- read.csv2(url1, sep = ";")
 df2 <- read.csv2(url2, sep = ";")
 ```
@@ -84,38 +80,30 @@ Perform the following tasks to prepare the data frame `df` for analysis:
 4.  Convert the `type` column to a factor
 5.  Remove rows (if any) with missing values.
 
-
-
 ```{R}
-# add type row
-df1 <- df1 %>% mutate(type = "white")
-df2 <- df2 %>% mutate(type = "red")
-```
-```{r}
+# add type column
+df1 <- df1 %>% 
+  mutate(type = "white")
+df2 <- df2 %>% 
+  mutate(type = "red")
+
 # bind rows
 df <- bind_rows(df1, df2)
-```
-```{R}
+
 # replace instances of "." with an underscore
 colnames(df) <- gsub("\\.", "_", colnames(df))
-```
-```{R}
+
 # remove columns fixed_acidity and free_sulfur_dioxide
 df <- select(df, -fixed_acidity, -free_sulfur_dioxide)
-```
-```{R}
+
 # convert type column to a factor
 df$type <- as.factor(df$type)
-```
-```{R}
+
 # remove rows with missing values
 df <- na.omit(df)
-```
-```{R}
+
 dim(df)
 ```
-
-
 
 Your output to `R dim(df)` should be
 
@@ -140,14 +128,49 @@ the difference in means (with the equal variance assumption)
 3.  Using `sp_squared` and `diff_mean`, compute the $t$ Statistic, and
     store its value in a variable called `t1`.
 
-``` {r}
-mean_red <- df %>% filter(type == "red") %>% summarise(mean_red_quality = mean(quality, na.rm = TRUE))
-mean_white <- df %>% filter(type == "white") %>% summarise(mean_white_quality = mean(quality, na.rm = TRUE))
-diff_mean <- mean_white$mean_white_quality - mean_red$mean_red_quality
-```
 ```{r}
-sp <-  ... # Insert your code here
-t1 <-  ... # Insert your code here
+# calculate red mean
+mean_red <- df %>% 
+  filter(type == "red") %>% 
+  summarise(red_quality_mean = mean(quality, na.rm = TRUE))
+mean_red <- mean_red[1, 1]
+
+# calculate white mean
+mean_white <- df %>% 
+  filter(type == "white") %>% 
+  summarise(white_quality_mean = mean(quality, na.rm = TRUE))
+mean_white <- mean_white[1, 1]
+
+# calculate difference in means
+diff_mean <- mean_white - mean_red
+diff_mean
+```
+
+```{r}
+# calculate red variance
+variance_red <- df %>% 
+  filter(type == "red") %>% 
+  summarise(red_quality_variance = var(quality, na.rm = TRUE))
+variance_red <- variance_red[1, 1]
+
+# calculate white variance
+variance_white <- df %>%
+  filter(type == "white") %>%
+  summarise(white_quality_variance = var(quality, na.rm = TRUE))
+variance_white <- variance_white[1, 1]
+
+# calculate count for red and white
+count_red <- nrow(df[df$type == "red", ])
+count_white <- nrow(df[df$type == "white", ])
+
+# calculate pooled sample variance
+sp_squared <- ((count_red - 1) * variance_red + ((count_white - 1) * variance_white)) / (count_red + count_white - 2)
+sp_squared
+```
+
+```{r}
+t1 <- diff_mean / sqrt(sp_squared * (1 / count_red + 1 / count_white) / 2)
+t1
 ```
 
 ------------------------------------------------------------------------
@@ -162,7 +185,7 @@ Perform a two-sample t-test to compare the quality of white and red
 wines using the `t.test()` function with the setting `var.equal=TRUE`.
 Store the t-statistic in `t2`.
 
-``` r
+```{r}
 t_test <- t.test(...) # Insert your code here
 t2 <- ... # Insert your code here
 ```
