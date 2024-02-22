@@ -186,7 +186,18 @@ wines using the `t.test()` function with the setting `var.equal=TRUE`.
 Store the t-statistic in `t2`.
 
 ```{r}
-t_test <- t.test(...) # Insert your code here
+# filter for red and store
+red_only <- df %>%
+  filter(type == "red")
+
+# filter for white and store
+white_only <- df %>%
+  filter(type == "white")
+
+t_test <- t.test(white_only$quality, red_only$quality, var.equal = TRUE)
+t_test
+```
+```{r}
 t2 <- ... # Insert your code here
 ```
 
