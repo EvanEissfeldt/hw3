@@ -94,7 +94,7 @@ df <- bind_rows(df1, df2)
 colnames(df) <- gsub("\\.", "_", colnames(df))
 
 # remove columns fixed_acidity and free_sulfur_dioxide
-df <- select(df, -fixed_acidity, -free_sulfur_dioxide)
+df <- select(df, -fixed.acidity, -free.sulfur.dioxide)
 
 # convert type column to a factor
 df$type <- as.factor(df$type)
@@ -167,9 +167,9 @@ count_white <- nrow(df[df$type == "white", ])
 sp_squared <- ((count_red - 1) * variance_red + ((count_white - 1) * variance_white)) / (count_red + count_white - 2)
 sp_squared
 ```
-
 ```{r}
-t1 <- diff_mean / sqrt(sp_squared * (1 / count_red + 1 / count_white) / 2)
+# calculate t-statistic
+t1 <- diff_mean / sqrt(sp_squared * (1/count_red + 1/count_white))
 t1
 ```
 
@@ -198,7 +198,8 @@ t_test <- t.test(white_only$quality, red_only$quality, var.equal = TRUE)
 t_test
 ```
 ```{r}
-t2 <- ... # Insert your code here
+t2 <- t_test$statistic
+t2
 ```
 
 ------------------------------------------------------------------------
@@ -209,9 +210,10 @@ Fit a linear regression model to predict `quality` from `type` using the
 `lm()` function, and extract the $t$-statistic for the `type`
 coefficient from the model summary. Store this $t$-statistic in `t3`.
 
-``` r
-fit <- lm(...) # Insert your here
-t3 <- ... # Insert your here
+``` {r}
+fit <- lm(quality ~ type, data = df) 
+t3 <- coef(summary(fit))[, "t value"][2]
+t3
 ```
 
 ------------------------------------------------------------------------
@@ -221,10 +223,10 @@ t3 <- ... # Insert your here
 Print a vector containing the values of `t1`, `t2`, and `t3`. What can
 you conclude from this? Why?
 
-``` r
-c(t1, t2, t3) # Insert your code here
+```{r}
+c(t1, t2, t3)
 ```
-
+The t-statistics are all the same. 9.68 is also very large for a t-statistic, meaning it is significant.
 <br><br><br><br> <br><br><br><br> ---
 
 ## Question 2
@@ -243,9 +245,20 @@ Fit a linear regression model with all predictors against the response
 variable `quality`. Use the `broom::tidy()` function to print a summary
 of the fitted model. What can we conclude from the model summary?
 
-``` r
-... # Insert your code here
+```{r}
+df$volatile_acidity <- as.numeric(as.character(df$volatile_acidity))
+df$citric_acid <- as.numeric(as.character(df$citric_acid))
+df$residual_sugar <- as.numeric(as.character(df$residual_sugar))
+df$chlorides <- as.numeric(as.character(df$chlorides))
+df$total_sulfur_dioxide <- as.numeric(as.character(df$total_sulfur_dioxide))
+df$sulphates <- as.numeric(as.character(df$sulphates))
+df$density <- as.numeric(as.character(df$density))
+df$pH <- as.numeric(as.character(df$pH))
+df$alcohol <- as.numeric(as.character(df$alcohol))
+regression_model <- lm(quality ~ ., data = df)
+print(broom::tidy(regression_model))
 ```
+All of the p-values except the ones for citric_acid, total_sulfur_dioxide and are very low, indicating that most of the variables are statistically significant when predicting the quality of the wine.
 
 ------------------------------------------------------------------------
 
@@ -257,13 +270,16 @@ Fit two **simple** linear regression models using `lm()`: one with only
 as the response variable. How does your model summary compare to the
 summary from the previous question?
 
-``` r
-model_citric <- ... # Insert your code here
+```{r}
+citric_model <- lm(quality ~ citric_acid, data = df)
+print(broom::tidy(citric_model))
 ```
 
-``` r
-model_sulfur <- ... # Insert your code here
+```{r}
+sulfur_model <- lm(quality ~ total_sulfur_dioxide, data = df)
+print(broom::tidy(sulfur_model))
 ```
+In these individual models, both the citric_acid and the total_sulfur_dioxide have much higher p-values than in the original model.
 
 ------------------------------------------------------------------------
 
@@ -272,8 +288,11 @@ model_sulfur <- ... # Insert your code here
 Visualize the correlation matrix of all numeric columns in `df` using
 `corrplot()`
 
-``` r
-df %>% ... # Insert your code here
+```{r}
+library(corrplot)
+dataframe_numeric <- df %>% select_if(is.numeric)
+corr_matrix <- cor(dataframe_numeric)
+corrplot(corr_matrix, method = "color")
 ```
 
 ------------------------------------------------------------------------
@@ -283,9 +302,10 @@ df %>% ... # Insert your code here
 Compute the variance inflation factor (VIF) for each predictor in the
 full model using `vif()` function. What can we conclude from this?
 
-``` r
-... # Insert your code here
+```{r}
+vif(regression_model)
 ```
+It seems to be that density and type have high multicollinearity that needs to be accounted for.
 
 <br><br><br><br> <br><br><br><br> ---
 
@@ -305,8 +325,9 @@ Run a backward stepwise regression using a `full_model` object as the
 starting model. Store the final formula in an object called
 `backward_formula` using the built-in `formula()` function in R
 
-``` r
-... # Insert your code here
+```{r}
+full_model <- regression_model
+backwards_model <- step(regression_model, scope = formula(regression_model), direction = "backward")
 ```
 
 ------------------------------------------------------------------------
@@ -317,8 +338,9 @@ Run a forward stepwise regression using a `null_model` object as the
 starting model. Store the final formula in an object called
 `forward_formula` using the built-in `formula()` function in R
 
-``` r
-... # Insert your code here
+```{r}
+null_model <- lm(quality ~ 1, df)
+forward_model <- step(null_model, scope = formula(regression_model), direction = "forward")
 ```
 
 ------------------------------------------------------------------------
@@ -334,17 +356,40 @@ starting model. Store the final formula in an object called
 3.  Then, use the `cv.glmnet()` function to perform LASSO and Ridge
     regression with `X` and `y`.
 
-``` r
-... # Insert your code here. 
+```{r}
+y = c(df$quality)
+```
+```{R}
+make_model_matrix <- function(formula){
+  X <- model.matrix(formula, df)[, -1]
+  cnames <- colnames(X)
+  for(i in 1:ncol(X)){
+    if(!cnames[i] == "typewhite"){
+      X[, i] <- scale(X[, i])
+    } else {
+      colnames(X)[i] <- "type"
+    }
+  }
+  return(X)
+}
+```
+```{R}
+model_matrix <- make_model_matrix(formula(regression_model))
+```
+```{R}
+lasso_model <- cv.glmnet(model_matrix, y, alpha = 1)
+ridge_model <- cv.glmnet(model_matrix, y, alpha = 0)
 ```
 
 Create side-by-side plots of the ridge and LASSO regression results.
 Interpret your main findings.
 
-``` r
+```{r}
 par(mfrow=c(1, 2))
-... # Insert your code here. 
+plot(lasso_model, main = "Lasso Model")
+plot(ridge_model, main = "Ridge Model") 
 ```
+In the Lasso model, we see the MSE start to spike in between -4 and -3. In the Ridge model, we see the MSE spike slightly after -2, and then start to flatten out around 3.
 
 ------------------------------------------------------------------------
 
@@ -356,6 +401,24 @@ value? What are the variables selected by LASSO?
 Store the variable names with non-zero coefficients in `lasso_vars`, and
 create a formula object called `lasso_formula` using the
 `make_formula()` function provided in the Appendix.
+
+```{R}
+lasso_coefficients <- coef(lasso_model, s = "lambda.1se")
+print(lasso_coefficients)
+```
+```{r}
+make_formula <- function(x){
+  as.formula(
+    paste("quality ~ ", paste(x, collapse = " + "))
+  )
+}
+
+# For example the following code will
+# result in a formula object
+# "quality ~ a + b + c"
+make_formula(c("a", "b", "c"))
+```
+
 
 ------------------------------------------------------------------------
 
