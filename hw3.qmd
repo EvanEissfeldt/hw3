@@ -94,7 +94,7 @@ df <- bind_rows(df1, df2)
 colnames(df) <- gsub("\\.", "_", colnames(df))
 
 # remove columns fixed_acidity and free_sulfur_dioxide
-df <- select(df, -fixed.acidity, -free.sulfur.dioxide)
+df <- select(df, -fixed_acidity, -free_sulfur_dioxide)
 
 # convert type column to a factor
 df$type <- as.factor(df$type)
@@ -406,18 +406,22 @@ create a formula object called `lasso_formula` using the
 lasso_coefficients <- coef(lasso_model, s = "lambda.1se")
 print(lasso_coefficients)
 ```
+```{R}
+lasso_vars <- rownames(lasso_coefficients)[-1]
+lasso_vars <- lasso_vars[lasso_coefficients[-1,] != 0]
+```
 ```{r}
 make_formula <- function(x){
   as.formula(
     paste("quality ~ ", paste(x, collapse = " + "))
   )
 }
-
-# For example the following code will
-# result in a formula object
-# "quality ~ a + b + c"
-make_formula(c("a", "b", "c"))
 ```
+```{R}
+lasso_formula <- make_formula(lasso_vars)
+lasso_formula
+```
+
 
 
 ------------------------------------------------------------------------
@@ -431,12 +435,26 @@ Store the variable names with non-zero coefficients in `ridge_vars`, and
 create a formula object called `ridge_formula` using the
 `make_formula()` function provided in the Appendix.
 
+```{R}
+ridge_coefficients <- coef(ridge_model, s = "lambda.1se")
+print(ridge_coefficients)
+```
+```{R}
+ridge_vars <- rownames(ridge_coefficients)[-1]
+ridge_vars <- ridge_vars[ridge_coefficients[-1,] != 0]
+ridge_formula <- make_formula(ridge_vars)
+ridge_formula
+```
+
+
 ------------------------------------------------------------------------
 
 ###### 3.6 (10 points)
 
 What is the difference between stepwise selection, LASSO and ridge based
 on you analyses above?
+
+Stepwise selection adds or removes predictors one at a time, and retests Sum of Squares, RSS, and AIC one at a time, until it achieves optimal results. LASSO penalizes sum of squared coefficients and forces certain coefficients to zero. Ridge also penalizes large coefficients, but will not force coefficients to zero like LASSO.
 
 <br><br><br><br> <br><br><br><br> ---
 
