@@ -327,7 +327,10 @@ starting model. Store the final formula in an object called
 
 ```{r}
 full_model <- regression_model
-backwards_model <- step(regression_model, scope = formula(regression_model), direction = "backward")
+backward_model <- step(regression_model, scope = formula(regression_model), direction = "backward")
+```
+```{R}
+backward_formula <- formula(backward_model)
 ```
 
 ------------------------------------------------------------------------
@@ -341,6 +344,9 @@ starting model. Store the final formula in an object called
 ```{r}
 null_model <- lm(quality ~ 1, df)
 forward_model <- step(null_model, scope = formula(regression_model), direction = "forward")
+```
+```{R}
+forward_formula <- formula(forward_model)
 ```
 
 ------------------------------------------------------------------------
@@ -474,6 +480,8 @@ Excluding `quality` from `df` we have $10$ possible predictors as the
 covariates. How many different models can we create using any subset of
 these $10$ coavriates as possible predictors? Justify your answer.
 
+To calculate this, we can use 2 to the power of n, where n is the number covariates. This gives us 2 raised to the power of 10. This equals 1024.
+
 ------------------------------------------------------------------------
 
 ###### 4.2 (20 points)
@@ -481,7 +489,7 @@ these $10$ coavriates as possible predictors? Justify your answer.
 Store the names of the predictor variables (all columns except
 `quality`) in an object called `x_vars`.
 
-``` r
+``` {r}
 x_vars <- colnames(df %>% select(-quality))
 ```
 
@@ -494,12 +502,12 @@ to **generate all possible linear regression formulas** using the
 variables in `x_vars`. This is most optimally achieved using the `map()`
 function from the `purrr` package.
 
-``` r
+```{r}
 formulas <- map(
   1:length(x_vars),
   \(x){
-    vars <- combn(...) # Insert code here
-    map(vars, ...) # Insert code here
+    vars <- combn(x_vars, x, simplify = FALSE)
+  map(vars, ~ make_formula(.))
   }
 ) %>% unlist()
 ```
@@ -507,7 +515,7 @@ formulas <- map(
 If your code is right the following command should return something
 along the lines of:
 
-``` r
+``` {r}
 sample(formulas, 4) %>% as.character()
 # Output:
 # [1] "quality ~ volatile_acidity + residual_sugar + density + pH + alcohol"                                                 
@@ -526,9 +534,10 @@ extract the model summary statistics, and bind them together into a
 single tibble of summaries using the `bind_rows()` function from
 `dplyr`.
 
-``` r
-models <- map(formulas, ...) # Insert your code here
-summaries <- map(models, ...) # Insert your code here
+``` {r}
+models <- map(formulas, ~lm(.x, data = df))
+summaries <- map(models, broom::glance)
+single_tibble = bind_rows(summaries)
 ```
 
 ------------------------------------------------------------------------
@@ -538,14 +547,19 @@ summaries <- map(models, ...) # Insert your code here
 Extract the `adj.r.squared` values from `summaries` and use them to
 identify the formula with the ***highest*** adjusted R-squared value.
 
-``` r
-... # Insert your code here
+```{r}
+get_arsv <- function(formula, df){
+  arsv_model <- lm(formula, data = df)
+  return(summary(arsv_model)$adj.r.squared)}
+
+adj_r_squared <- sapply(summaries, get_arsv)
 ```
 
 Store resulting formula as a variable called `rsq_formula`.
 
-``` r
-rsq_formula <- ... # Insert your code
+``` {r}
+rsq_formula <- formulas[which.max(adj_r_squared)]
+rsq_formula
 ```
 
 ------------------------------------------------------------------------
@@ -554,16 +568,23 @@ rsq_formula <- ... # Insert your code
 
 Extract the `AIC` values from `summaries` and use them to identify the
 formula with the ***lowest*** AIC value.
+```{R}
+get_AIC <- function(formula, df){
+  AIC_model <- AIC(lm(formula, data = df))
+  return(AIC_model)
+}
 
-``` r
-... # Insert your code here
+AIC_values <- sapply(formulas, get_AIC, df)
 ```
 
 Store resulting formula as a variable called `aic_formula`.
 
-``` r
-aic_formula <- ... # Insert your code
+``` {r}
+aic_formula <- formulas[which.min(AIC_values)]
+aic_formula <- as.character(aic_formula)
+aic_formula
 ```
+
 
 ------------------------------------------------------------------------
 
@@ -572,7 +593,7 @@ aic_formula <- ... # Insert your code
 Combine all formulas shortlisted into a single vector called
 `final_formulas`.
 
-``` r
+``` {r}
 null_formula <- formula(null_model)
 full_formula <- formula(full_model)
 
@@ -587,14 +608,25 @@ final_formulas <- c(
   aic_formula
 )
 ```
+```{R}
+backward_formula
+```
+
+
 
 -   Are `aic_formula` and `rsq_formula` the same? How do they differ
     from the formulas shortlisted in question 3?
+    
+These formulas are not the same. The rsq formula is very short compared to those in question 3, as it is just one term. In regard to the amount of terms, the aic_formula is closer to the formulas from question 3, although it is still smaller.
 
 -   Which of these is more reliable? Why?
 
+The AIC formula will be more reliable. This is because the R squared formula has a higher AIC, meaning it will have worse predictive accuracy.
+
 -   If we had a dataset with $10,000$ columns, which of these methods
     would you consider for your analyses? Why?
+    
+I would consider the LASSO formula. This is because the LASSO model will force many coefficients to zero, and slim down the very large variable pool.
 
 ------------------------------------------------------------------------
 
@@ -605,14 +637,18 @@ Use `map()` and `glance()` to extract the
 obtained from `final_formulas`. Bind them together into a single data
 frame `summary_table`. Summarize your main findings.
 
-``` r
+```{r}
 summary_table <- map(
   final_formulas, 
-  \(x) ... # Insert your code here
+  \(x)  broom::glance(lm(x, data = df)) %>% select(sigma, adj.r.squared, AIC, df, p.value)
 ) %>% bind_rows()
 
 summary_table %>% knitr::kable()
 ```
+All of the formulas have similar r-squared. The second to last formula is the only outlier with an r-squared that is much lower than the rest. Each of the formulas also has a very similar AIC, however the second to last formula has a higher AIC than the rest. Most of the formulas have a df of 6, 8 or 10. However, the second to last formula has a df of 1.
+
+
+
 
 ::: {.hidden unless-format="pdf"}
 \pagebreak
